@@ -26,65 +26,101 @@ fi
 ### runs sheath without getting dependencies
 function run_sheath_no_get_deps() {
   cd "$INPUT_DIR" || exit 1
-  for export in $EXPORTS; do
+  for export in "${EXPORTS[@]}"; do
     echo "exporting $export to sheath environment"
-    export "${export?}"
+    export ${export?}
   done
   "$SHEATH" "$@"
+}
+
+function install_local_dependency() {
+  eval "$(. "$1/PKGSCRIPT";
+  echo "NAME=$NAME";
+  echo "VERSION=$VERSION";
+  echo "EPOCH=$EPOCH";)"
+  if [ -f "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz" ]; then
+    echo "HOLE: Installing from local cache: $1/${NAME}-${VERSION}-${EPOCH}.tar.xz"
+    # install dependencies
+    get_deps 0 0 "$1"
+    # re-source due to clobbering
+    eval "$(. "$1/PKGSCRIPT";
+    echo "NAME=$NAME";
+    echo "VERSION=$VERSION";
+    echo "EPOCH=$EPOCH";)"
+    # install the package
+    yes | "$BULGE" li "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz"
+    return 0
+  else
+    return 1
+  fi
 }
 
 function get_dependency() {
   # fixme: awful hack to prevent overwriting gcc with gcc-libs, this will be fixed in the future
   if [ "$1" = "gcc-libs" ]; then
-    echo "=== Refusing to install gcc-libs ==="
+    echo "HOLE: Refusing to install gcc-libs"
     return
   fi
+  NEEDS_DOWNLOAD=1
   # if PKG_CACHE is set, check that first
   if [ -n "$PKG_CACHE" ]; then
     if [ -d "$PKG_CACHE/$1" ]; then
       if [ -f "$PKG_CACHE/$1/PKGSCRIPT" ]; then
-        # source the PKGSCRIPT and check that there's a tar.xz file with ${NAME?}-${VERSION?}.tar.xz
-        . "$PKG_CACHE/$1/PKGSCRIPT"
-        if [ -f "$PKG_CACHE/$1/${NAME?}-${VERSION?}-${EPOCH?}.tar.xz" ]; then
-          echo "=== Installing dependency $1 from cache ==="
-          CURRENT_DIR=$(pwd)
-          cd "$PKG_CACHE/$1" || exit 1
-          yes | "$SHEATH" -i
-          cd "$CURRENT_DIR" || exit 1
-          return
+        PKG_DIR="$PKG_CACHE/$1"
+        # check result of install_local_dependency
+        if install_local_dependency "$PKG_DIR"; then
+          NEEDS_DOWNLOAD=0
         fi
       fi
     fi
   fi
 
   # otherwise, download it
-  yes | "$BULGE" i "$1"
+  if [ "$NEEDS_DOWNLOAD" = "1" ]; then
+    echo "HOLE: Downloading dependency $1"
+    yes | "$BULGE" i "$1"
+  fi
 }
 
-### runs sheath and downloads dependencies
-function run_sheath_get_deps() {
+function get_deps() {
+  GET_MAKE_DEPS="$1"
+  GET_OPT_DEPS="$2"
+  PKG_DIR="$3"
   # source the PKGSCRIPT
-  . "$INPUT_DIR/PKGSCRIPT"
+  eval "$(. "$PKG_DIR/PKGSCRIPT";
+  echo "DEPENDS=(${DEPENDS[*]})";
+  echo "MK_DEPENDS=(${MK_DEPENDS[*]})";
+  echo "OPT_DEPENDS=(${OPT_DEPENDS[*]})";)"
 
-  echo "=== Updating bulge database ==="
+  echo "HOLE: Updating bulge database"
 
   yes | "$BULGE" s
   yes | "$BULGE" u
 
   for dep in "${DEPENDS[@]}"; do
-    echo "=== Installing dependency $dep ==="
+    echo "HOLE: Installing dependency $dep"
     get_dependency "$dep"
   done
 
-  for mkdep in "${MK_DEPENDS[@]}"; do
-    echo "=== Installing build dependency $mkdep ==="
-    get_dependency "$mkdep"
-  done
+  if [ "$GET_MAKE_DEPS" = "1" ]; then
+    for mkdep in "${MK_DEPENDS[@]}"; do
+      echo "HOLE: Installing build dependency $mkdep"
+      get_dependency "$mkdep"
+    done
+  fi
 
-  for optdep in "${OPT_DEPENDS[@]}"; do
-    echo "=== Installing optional dependency $mkdep ==="
-    get_dependency "$mkdep"
-  done
+  if [ "$GET_OPT_DEPS" = "1" ]; then
+    for optdep in "${OPT_DEPENDS[@]}"; do
+      echo "HOLE: Installing optional dependency $optdep"
+      get_dependency "$optdep"
+    done
+  fi
+}
+
+### runs sheath and downloads dependencies
+function run_sheath_get_deps() {
+  # get dependencies
+  get_deps 1 1 "$INPUT_DIR"
 
   # we should now be able to just run sheath
   run_sheath_no_get_deps "$@"
@@ -112,7 +148,7 @@ while getopts ":hbicpfte:" opt; do
             NEEDS_GET_DEPS=1
             ;;
         i)
-            # todo: implement install system
+            # don't do anything, installs are handled outside of the container
             ;;
         c)
             NEW_ARGS="$NEW_ARGS -c"
@@ -138,8 +174,8 @@ fi
 if [ "$TESTING" -eq 1 ]; then
   echo ""
   echo ""
-  echo "=== Testing mode activated ==="
-  echo "=== Type 'exit' to exit ==="
+  echo "HOLE: Testing mode activated"
+  echo "HOLE: Type 'exit' to exit"
   /usr/bin/env -i   \
   	HOME=/root                  \
   	TERM="$TERM"                \

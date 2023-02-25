@@ -13,12 +13,12 @@ if ! command -v "$I_PREFER" &>/dev/null; then
   fi
 fi
 
-DO_TESTING=0
+DO_INSTALL=0
 
-while getopts ":t" opt; do
+while getopts ":i" opt; do
     case $opt in
-        t)
-          DO_TESTING=1
+        i)
+          DO_INSTALL=1
           ;;
         \?)
           ;;
@@ -32,4 +32,18 @@ if [ -z "$PKG_CACHE" ]; then
 else
   PKG_CACHE=$(realpath "$PKG_CACHE")
   "$I_PREFER" run --rm -it -v "$PWD":/input -v "$PKG_CACHE":/pkg_cache -e PKG_CACHE=/pkg_cache hole_container_donotremove:latest /factory/hole_inner.sh "$@"
+fi
+
+if [ "$DO_INSTALL" = "1" ]; then
+  # if the -i flag was passed, we will install the package that was built
+  # make sure that there's a PKGSCRIPT in this directory
+  if [ ! -f PKGSCRIPT ]; then
+    echo "error: no PKGSCRIPT found in current directory, cannot install package!"
+    exit 1
+  fi
+  # source the PKGSCRIPT
+  . PKGSCRIPT
+
+  # copied from sheath
+  bulge li "${NAME}-${VERSION}-${EPOCH}.tar.xz"
 fi
