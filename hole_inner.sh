@@ -48,7 +48,7 @@ function install_local_dependency() {
     echo "VERSION=$VERSION";
     echo "EPOCH=$EPOCH";)"
     # install the package
-    yes | "$BULGE" li "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz"
+    yes | "$BULGE" li "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz" &>/dev/null
     return 0
   else
     return 1
@@ -61,6 +61,17 @@ function get_dependency() {
     echo "HOLE: Refusing to install gcc-libs"
     return
   fi
+  # if the package is already installed, don't download it
+  if [ -f "/factory/installed_packages" ]; then
+    if grep -q "$1" "/factory/installed_packages"; then
+      echo "HOLE: $1 is already installed, skipping"
+      return
+    fi
+  fi
+
+  # add the dependency to the list of installed packages
+  echo "$1" >> "/factory/installed_packages"
+
   NEEDS_DOWNLOAD=1
   # if PKG_CACHE is set, check that first
   if [ -n "$PKG_CACHE" ]; then
@@ -78,38 +89,47 @@ function get_dependency() {
   # otherwise, download it
   if [ "$NEEDS_DOWNLOAD" = "1" ]; then
     echo "HOLE: Downloading dependency $1"
-    yes | "$BULGE" i "$1"
+    # if bulge outputs "was not found!" we can assume that a package with that name does not exist
+    if yes | "$BULGE" i "$1" | grep -q "was not found!"; then
+      echo "HOLE: CRITICAL ERROR! dependency $1 not found!"
+      exit 1
+    fi
   fi
 }
 
 function get_deps() {
-  GET_MAKE_DEPS="$1"
-  GET_OPT_DEPS="$2"
-  PKG_DIR="$3"
+  # GET_MAKE_DEPS="$1"
+  # GET_OPT_DEPS="$2"
+  # PKG_DIR="$3"
   # source the PKGSCRIPT
-  eval "$(. "$PKG_DIR/PKGSCRIPT";
+  eval "$(. "$3/PKGSCRIPT";
   echo "DEPENDS=(${DEPENDS[*]})";
   echo "MK_DEPENDS=(${MK_DEPENDS[*]})";
   echo "OPT_DEPENDS=(${OPT_DEPENDS[*]})";)"
-
-  echo "HOLE: Updating bulge database"
-
-  yes | "$BULGE" s
-  yes | "$BULGE" u
 
   for dep in "${DEPENDS[@]}"; do
     echo "HOLE: Installing dependency $dep"
     get_dependency "$dep"
   done
 
-  if [ "$GET_MAKE_DEPS" = "1" ]; then
+  if [ "$1" = "1" ]; then
+    # re-source due to clobbering
+    eval "$(. "$3/PKGSCRIPT";
+    echo "DEPENDS=(${DEPENDS[*]})";
+    echo "MK_DEPENDS=(${MK_DEPENDS[*]})";
+    echo "OPT_DEPENDS=(${OPT_DEPENDS[*]})";)"
     for mkdep in "${MK_DEPENDS[@]}"; do
       echo "HOLE: Installing build dependency $mkdep"
       get_dependency "$mkdep"
     done
   fi
 
-  if [ "$GET_OPT_DEPS" = "1" ]; then
+  if [ "$2" = "1" ]; then
+    # re-source due to clobbering
+    eval "$(. "$3/PKGSCRIPT";
+    echo "DEPENDS=(${DEPENDS[*]})";
+    echo "MK_DEPENDS=(${MK_DEPENDS[*]})";
+    echo "OPT_DEPENDS=(${OPT_DEPENDS[*]})";)"
     for optdep in "${OPT_DEPENDS[@]}"; do
       echo "HOLE: Installing optional dependency $optdep"
       get_dependency "$optdep"
@@ -119,6 +139,11 @@ function get_deps() {
 
 ### runs sheath and downloads dependencies
 function run_sheath_get_deps() {
+  echo "HOLE: Updating bulge database"
+
+  yes | "$BULGE" s &>/dev/null
+  yes | "$BULGE" u &>/dev/null
+
   # get dependencies
   get_deps 1 1 "$INPUT_DIR"
 
