@@ -26,4 +26,10 @@ while getopts ":t" opt; do
 done
 
 # now, we will simply run the hole_inner.sh script inside the container
-"$I_PREFER" run --rm -it -v "$PWD":/input hole_container_donotremove:latest /factory/hole_inner.sh "$@"
+# if PKG_CACHE is set, we will mount it to /pkg_cache and set the PKG_CACHE environment variable to /pkg_cache
+if [ -z "$PKG_CACHE" ]; then
+  "$I_PREFER" run --rm -it -v "$PWD":/input hole_container_donotremove:latest /factory/hole_inner.sh "$@"
+else
+  PKG_CACHE=$(realpath "$PKG_CACHE")
+  "$I_PREFER" run --rm -it -v "$PWD":/input -v "$PKG_CACHE":/pkg_cache -e PKG_CACHE=/pkg_cache hole_container_donotremove:latest /factory/hole_inner.sh "$@"
+fi
