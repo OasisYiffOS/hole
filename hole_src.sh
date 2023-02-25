@@ -13,6 +13,20 @@ if ! command -v "$I_PREFER" &>/dev/null; then
   fi
 fi
 
+function install() {
+  # if the -i flag was passed, we will install the package that was built
+  # make sure that there's a PKGSCRIPT in this directory
+  if [ ! -f PKGSCRIPT ]; then
+    echo "error: no PKGSCRIPT found in current directory, cannot install package!"
+    exit 1
+  fi
+  # source the PKGSCRIPT
+  . PKGSCRIPT
+
+  # copied from sheath
+  bulge li "${NAME}-${VERSION}-${EPOCH}.tar.xz"
+}
+
 DO_INSTALL=0
 
 while getopts ":i" opt; do
@@ -25,6 +39,12 @@ while getopts ":i" opt; do
     esac
 done
 
+# if the only argument is -i, we will just install
+if [ "$DO_INSTALL" = "1" ] && [ "$#" -eq 1 ]; then
+  install
+  exit 0
+fi
+
 # now, we will simply run the hole_inner.sh script inside the container
 # if PKG_CACHE is set, we will mount it to /pkg_cache and set the PKG_CACHE environment variable to /pkg_cache
 if [ -z "$PKG_CACHE" ]; then
@@ -35,15 +55,5 @@ else
 fi
 
 if [ "$DO_INSTALL" = "1" ]; then
-  # if the -i flag was passed, we will install the package that was built
-  # make sure that there's a PKGSCRIPT in this directory
-  if [ ! -f PKGSCRIPT ]; then
-    echo "error: no PKGSCRIPT found in current directory, cannot install package!"
-    exit 1
-  fi
-  # source the PKGSCRIPT
-  . PKGSCRIPT
-
-  # copied from sheath
-  bulge li "${NAME}-${VERSION}-${EPOCH}.tar.xz"
+  install
 fi
