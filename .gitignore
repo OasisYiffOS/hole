@@ -1,0 +1,2 @@
+# default install directory is the working directory, don't commit the copied hole
+/hole
