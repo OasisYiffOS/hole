@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+EXPORTS=""
+
 # assert that the PKGSCRIPT exists at /input/PKGSCRIPT
 INPUT_DIR=/input
 if [ ! -f "$INPUT_DIR/PKGSCRIPT" ]; then
@@ -24,6 +26,10 @@ fi
 ### runs sheath without getting dependencies
 function run_sheath_no_get_deps() {
   cd "$INPUT_DIR" || exit 1
+  for export in $EXPORTS; do
+    echo "exporting $export to sheath environment"
+    export "${export?}"
+  done
   "$SHEATH" "$@"
 }
 
@@ -56,8 +62,11 @@ function run_sheath_get_deps() {
 
 NEEDS_GET_DEPS=0
 
-while getopts ":hbicpf" opt; do
+while getopts ":hbicpfe:" opt; do
     case $opt in
+        e) # special case for hole: pass env
+            EXPORTS="$EXPORTS $OPTARG"
+            ;;
         h)
             ;;
         b)

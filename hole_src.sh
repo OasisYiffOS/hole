@@ -13,5 +13,17 @@ if ! command -v "$I_PREFER" &>/dev/null; then
   fi
 fi
 
+DO_TESTING=0
+
+while getopts ":t" opt; do
+    case $opt in
+        t)
+          DO_TESTING=1
+          ;;
+        \?)
+          ;;
+    esac
+done
+
 # now, we will simply run the hole_inner.sh script inside the container
 "$I_PREFER" run --rm -it -v "$PWD":/input hole_container_donotremove:latest /factory/hole_inner.sh "$@"
