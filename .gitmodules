@@ -1,0 +1,3 @@
+[submodule "sheath"]
+	path = sheath
+	url = https://git.yiffos.gay/Packaging/sheath.git
