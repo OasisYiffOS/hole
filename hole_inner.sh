@@ -74,7 +74,7 @@ function get_dependency() {
   fi
   # if the package is already installed, don't download it
   if [ -f "/factory/installed_packages" ]; then
-    if grep -q "$1" "/factory/installed_packages"; then
+    if grep -q "^$1\$" "/factory/installed_packages"; then
       echo "HOLE: $1 is already installed, skipping"
       return
     fi
