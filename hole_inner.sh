@@ -28,6 +28,7 @@ function run_sheath_no_get_deps() {
   cd "$INPUT_DIR" || exit 1
   for export in "${EXPORTS[@]}"; do
     echo "exporting $export to sheath environment"
+    # shellcheck disable=SC2086
     export ${export?}
   done
   "$SHEATH" "$@"
@@ -39,7 +40,7 @@ function install_local_dependency() {
   echo "VERSION=$VERSION";
   echo "EPOCH=$EPOCH";)"
   if [ -f "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz" ]; then
-    echo "HOLE: Installing from local cache: $1/${NAME}-${VERSION}-${EPOCH}.tar.xz"
+    echo "HOLE: Deferring install from local cache: $1/${NAME}-${VERSION}-${EPOCH}.tar.xz"
     # install dependencies
     get_deps 0 0 "$1"
     # re-source due to clobbering
@@ -47,11 +48,21 @@ function install_local_dependency() {
     echo "NAME=$NAME";
     echo "VERSION=$VERSION";
     echo "EPOCH=$EPOCH";)"
-    # install the package
-    yes | "$BULGE" li "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz" &>/dev/null
+    # defer package installation to the end
+    echo "$1/${NAME}-${VERSION}-${EPOCH}.tar.xz" >> "/factory/deferred_packages"
     return 0
   else
     return 1
+  fi
+}
+
+function install_deferred_packages() {
+  if [ -f "/factory/deferred_packages" ]; then
+    while read -r line; do
+      echo "HOLE: Installing deferred package: $line"
+      yes | "$BULGE" li "$line" &>/dev/null
+    done < "/factory/deferred_packages"
+    rm "/factory/deferred_packages"
   fi
 }
 
@@ -147,6 +158,9 @@ function run_sheath_get_deps() {
   # get dependencies
   get_deps 1 1 "$INPUT_DIR"
 
+  # install deferred packages
+  install_deferred_packages
+
   # we should now be able to just run sheath
   run_sheath_no_get_deps "$@"
 }
@@ -190,6 +204,7 @@ while getopts ":hbicpfte:" opt; do
     esac
 done
 
+# shellcheck disable=SC2086
 if [ "$NEEDS_GET_DEPS" -eq 1 ]; then
   run_sheath_get_deps ${NEW_ARGS}
 else
