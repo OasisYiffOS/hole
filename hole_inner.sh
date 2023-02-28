@@ -23,6 +23,36 @@ if [ -z "$BULGE" ]; then
   exit 1
 fi
 
+
+### BEGIN HACKS (functions to fix issues that should be fixed upstream)
+
+# packages with docbook-xml as a dependency may fail because the docbook-xml postinst script hasn't been run
+# this function will run the postinst script
+DOCBOOKXML_POSTINST_RUN=0
+function hack_docbookxml_postinst() {
+  if [ "$DOCBOOKXML_POSTINST_RUN" = "1" ]; then
+    return 0
+  fi
+  POSTINST_URL="https://git.yiffos.gay/Packaging/packages/raw/commit/d193cc4c5a8d17a42ce4da5e17bd13855c8d4de9/docbook-xml/postinst.sh"
+  curl --output /tmp/docbookxml_postinst.sh "$POSTINST_URL" -L &>/dev/null
+  chmod +x /tmp/docbookxml_postinst.sh
+  /tmp/docbookxml_postinst.sh
+  DOCBOOKXML_POSTINST_RUN=1
+}
+
+# same as above, docbook-xsl has a postinst script that needs to be run
+DOCBOOKXSL_POSTINST_RUN=0
+function hack_docbookxsl_postinst() {
+    if [ "$DOCBOOKXSL_POSTINST_RUN" = "1" ]; then
+        return 0
+    fi
+    POSTINST_URL="https://git.yiffos.gay/Packaging/packages/raw/commit/d193cc4c5a8d17a42ce4da5e17bd13855c8d4de9/docbook-xsl/postinst.sh"
+    curl --output /tmp/docbookxsl_postinst.sh "$POSTINST_URL" -L &>/dev/null
+    chmod +x /tmp/docbookxsl_postinst.sh
+    /tmp/docbookxsl_postinst.sh
+    DOCBOOKXSL_POSTINST_RUN=1
+}
+
 ### runs sheath without getting dependencies
 function run_sheath_no_get_deps() {
   cd "$INPUT_DIR" || exit 1
@@ -78,6 +108,16 @@ function get_dependency() {
       echo "HOLE: $1 is already installed, skipping"
       return
     fi
+  fi
+
+  # if the package is docbook-xml or docbook-xsl, run said package's postinst script
+  if [ "$1" = "docbook-xml" ]; then
+    echo "HOLE (HACK): Running docbook-xml postinst script"
+    hack_docbookxml_postinst
+  fi
+  if [ "$1" = "docbook-xsl" ]; then
+    echo "HOLE (HACK): Running docbook-xsl postinst script"
+    hack_docbookxsl_postinst
   fi
 
   # add the dependency to the list of installed packages
