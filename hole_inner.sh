@@ -33,7 +33,7 @@ function hack_docbookxml_postinst() {
   if [ "$DOCBOOKXML_POSTINST_RUN" = "1" ]; then
     return 0
   fi
-  POSTINST_URL="https://git.yiffos.gay/Packaging/packages/raw/commit/ea852dd291765ce72d48f60618e7daf60d06a46a/docbook-xml/postinst.sh"
+  POSTINST_URL="https://git.yiffos.gay/Packaging/packages/raw/commit/8c81d4e39e2ac5497c0d96188fcc55182c09b46c/docbook-xml/postinst.sh"
   curl --output /tmp/docbookxml_postinst.sh "$POSTINST_URL" -L &>/dev/null
   chmod +x /tmp/docbookxml_postinst.sh
   /tmp/docbookxml_postinst.sh
