@@ -5,39 +5,43 @@
 
 WORKING_DIR=$(realpath "$(dirname "$0")")
 if [ -z "$WORKING_DIR" ]; then
-  echo "error: could not determine working directory!"
-  exit 1
+	echo "error: could not determine working directory!"
+	exit 1
 fi
 
 if [ -z "$INSTALL_PATH" ]; then
-  INSTALL_PATH="$WORKING_DIR"
+	INSTALL_PATH="$WORKING_DIR"
 fi
 
 INSTALL_PATH=$(realpath "$INSTALL_PATH")
 
 # check if sheath was cloned; if not, init submodules
 if [ ! -d "$WORKING_DIR/sheath" ]; then
-  echo "warning: sheath not found in working directory, initialising submodules"
-  git submodule update --init --recursive
+	echo "warning: sheath not found in working directory, initialising submodules"
+	git submodule update --init --recursive
 fi
 
 I_PREFER="podman"
 
 # if podman isn't installed, change to docker
 if ! command -v "$I_PREFER" &>/dev/null; then
-  I_PREFER="docker"
+	I_PREFER="docker"
 
-  # if docker isn't installed, error out
-  if ! command -v "$I_PREFER" &>/dev/null; then
-    echo "error: neither podman nor docker are installed! a container system is required for using hole!"
-    exit 1
-  fi
+	# if docker isn't installed, error out
+	if ! command -v "$I_PREFER" &>/dev/null; then
+		echo "error: neither podman nor docker are installed! a container system is required for using hole!"
+		exit 1
+	fi
 fi
 
 # build the container
 echo "building hole container..."
 cd "$WORKING_DIR" || exit
-"$I_PREFER" build -t hole_container_donotremove:latest .
+if [ -z "$HOLE_CLEAR_CACHE" ]; then
+	"$I_PREFER" build -t hole_container_donotremove:latest .
+else
+	"$I_PREFER" build -t hole_container_donotremove:latest --no-cache .
+fi
 
 # copy the hole_src.sh script to the install path as `hole` and chmod +x it
 echo "copying hole_src.sh to $INSTALL_PATH/hole"
